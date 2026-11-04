@@ -200,6 +200,21 @@ function setupEventListeners() {
   el.btnExportJson.addEventListener('click', exportToJson);
 }
 
+// Show verification required helper modal (Error 2332002)
+function showVerificationRequiredModal(details) {
+  const modal = document.getElementById('modal-verification');
+  if (modal) {
+    openModal(modal);
+  } else {
+    alert(
+      "Aviso da Meta:\n\n" +
+      "Para liberar o acesso à API da Biblioteca de Anúncios, a Meta exige que você confirme sua identidade no link oficial:\n" +
+      "https://facebook.com/ads/library/api\n\n" +
+      "Acesse o link, confirme seu perfil de desenvolvedor e tente novamente!"
+    );
+  }
+}
+
 // Modal management
 function openModal(modal) {
   modal.classList.remove('hidden');
@@ -322,6 +337,11 @@ async function initiateSearch() {
     const response = await fetch(fetchUrl);
     if (!response.ok) {
       const errorJson = await response.json().catch(() => ({}));
+      const subcode = errorJson.error?.error_subcode;
+      if (subcode === 2332002 || subcode === 2332004) {
+        showVerificationRequiredModal(errorJson.error?.error_user_msg || errorJson.error?.message);
+        return;
+      }
       throw new Error(errorJson.error?.message || `Erro HTTP ${response.status}`);
     }
 

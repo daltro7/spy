@@ -432,6 +432,55 @@
     </div>
   </div>
 
+  <!-- MODAL: VERIFICATION REQUIRED BY META -->
+  <div id="modal-verification" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-dark-900 border border-amber-500/50 rounded-2xl w-full max-w-xl p-6 shadow-2xl relative">
+      <button class="modal-close absolute right-4 top-4 text-slate-400 hover:text-white transition-colors">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Etapa Única Necessária na Meta</h3>
+          <p class="text-xs text-amber-400 font-medium">Confirmação de Identidade da Ad Library API</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300 leading-relaxed mb-6">
+        <p>
+          O seu token de acesso foi gerado com sucesso! No entanto, a Meta exige por regulamento que qualquer desenvolvedor que consulte a Biblioteca de Anúncios confirme a sua conta no link oficial:
+        </p>
+        <div class="p-3.5 bg-dark-950 rounded-xl border border-slate-800">
+          <div class="font-semibold text-white mb-1">Como resolver em 2 passos:</div>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
+            <li>Acesse a página oficial: <a href="https://www.facebook.com/ads/library/api" target="_blank" class="text-indigo-400 underline font-semibold hover:text-indigo-300">facebook.com/ads/library/api</a></li>
+            <li>Role até <b>"Requisitos para começar"</b> e clique em <b>Confirmar Identidade</b> (ou aceitar os termos da API).</li>
+          </ol>
+        </div>
+        <p class="text-[11px] text-slate-400">
+          Assim que a Meta liberar (leva poucos minutos), você já poderá minerar qualquer anúncio diretamente! Enquanto isso, você pode continuar usando os <b>Dados de Demonstração</b> e os filtros da plataforma.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+        <button type="button" class="modal-close px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300">
+          Fechar
+        </button>
+        <a 
+          href="https://www.facebook.com/ads/library/api" 
+          target="_blank" 
+          class="px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+        >
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          Abrir Confirmação na Meta
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: HELP / TUTORIAL TOKEN -->
   <div id="modal-help" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-dark-900 border border-slate-700 rounded-2xl w-full max-w-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto relative">
