@@ -395,14 +395,13 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Opção de Proxy CORS</label>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Modo de Conexão</label>
           <select id="setting-proxy" class="w-full bg-dark-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-            <option value="direct">Direto (Sem Proxy - Se seu navegador permitir CORS)</option>
-            <option value="corsproxy" selected>Proxy CORS Gratuito (corsproxy.io)</option>
-            <option value="allorigins">Proxy AllOrigins (api.allorigins.win)</option>
-            <option value="custom">Proxy Personalizado (Cloudflare Worker próprio)</option>
+            <option value="direct" selected>Direto com a Meta API (Recomendado)</option>
+            <option value="allorigins">Proxy Secundário AllOrigins (api.allorigins.win)</option>
+            <option value="custom">Proxy Personalizado (Cloudflare Worker)</option>
           </select>
-          <p class="text-[11px] text-slate-500 mt-1">Necessário no GitHub Pages para contornar bloqueios de CORS do navegador ao consultar a Graph API.</p>
+          <p class="text-[11px] text-slate-500 mt-1">A Graph API da Meta possui cabeçalhos de CORS nativos liberados para navegadores.</p>
         </div>
 
         <div id="wrapper-custom-proxy" class="hidden">

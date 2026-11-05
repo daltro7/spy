@@ -4,9 +4,16 @@
  */
 
 // Application State
+let savedProxy = localStorage.getItem('meta_proxy_type') || 'direct';
+// Migrate deprecated corsproxy.io to direct
+if (savedProxy === 'corsproxy') {
+  savedProxy = 'direct';
+  localStorage.setItem('meta_proxy_type', 'direct');
+}
+
 const state = {
   token: localStorage.getItem('meta_ad_token') || '',
-  proxyType: localStorage.getItem('meta_proxy_type') || 'corsproxy',
+  proxyType: savedProxy,
   customProxyUrl: localStorage.getItem('meta_custom_proxy') || '',
   favorites: JSON.parse(localStorage.getItem('meta_ad_favorites') || '[]'),
   currentRawAds: [],
@@ -336,11 +343,19 @@ async function initiateSearch() {
 
     const response = await fetch(fetchUrl);
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Token de acesso expirado ou inválido (401). Gere um novo no Graph API Explorer e atualize em 'Configurar Token'.");
+      }
       const errorJson = await response.json().catch(() => ({}));
       const subcode = errorJson.error?.error_subcode;
+      const errCode = errorJson.error?.code;
+
       if (subcode === 2332002 || subcode === 2332004) {
         showVerificationRequiredModal(errorJson.error?.error_user_msg || errorJson.error?.message);
         return;
+      }
+      if (errCode === 190) {
+        throw new Error("O Token da Meta expirou (Código 190). Gere um novo token no Graph API Explorer e atualize.");
       }
       throw new Error(errorJson.error?.message || `Erro HTTP ${response.status}`);
     }
@@ -400,12 +415,10 @@ async function fetchNextPage(nextUrl) {
 // Apply CORS Proxy Wrapper
 function applyCorsProxy(targetUrl) {
   switch (state.proxyType) {
-    case 'corsproxy':
-      return `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
-    case 'allorigins':
-      return `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
     case 'custom':
       return `${state.customProxyUrl}${encodeURIComponent(targetUrl)}`;
+    case 'allorigins':
+      return `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
     case 'direct':
     default:
       return targetUrl;
