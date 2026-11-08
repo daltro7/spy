@@ -246,6 +246,20 @@ function showVerificationRequiredModal(details) {
   }
 }
 
+// Open ad snapshot in a clean floating popup window (bypasses iframe X-Frame-Options: DENY)
+function openAdPopup(url) {
+  if (!url) return;
+  const width = 560;
+  const height = 820;
+  const left = Math.max(0, (window.screen.width - width) / 2);
+  const top = Math.max(0, (window.screen.height - height) / 2);
+  window.open(
+    url,
+    'metaAdSnapshotWindow',
+    `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,location=no,toolbar=no,menubar=no`
+  );
+}
+
 // Open full ad preview inside tool modal
 function openAdPreviewModal(ad) {
   if (!el.modalAdPreview) return;
@@ -296,8 +310,27 @@ function openAdPreviewModal(ad) {
     `;
   } else if (ad.snapshotUrl) {
     el.previewMediaContainer.innerHTML = `
-      <iframe src="${ad.snapshotUrl}" class="w-full h-full min-h-[460px] border-0 rounded-xl bg-slate-950" sandbox="allow-scripts allow-same-origin allow-popups" loading="lazy"></iframe>
+      <div class="p-8 text-center flex flex-col items-center justify-center max-w-md mx-auto">
+        <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
+          <i data-lucide="play-circle" class="w-8 h-8"></i>
+        </div>
+        <h4 class="text-base font-bold text-white mb-2">${escapeHtml(ad.pageName)}</h4>
+        <p class="text-xs text-slate-400 mb-6 leading-relaxed">
+          A Meta bloqueia a reprodução de criativos via iframe externo por segurança. Clique abaixo para abrir a reprodução original completa do anúncio em uma janela flutuante lateral sem nenhum bloqueio!
+        </p>
+        <button 
+          type="button"
+          class="btn-modal-open-popup px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold shadow-xl shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-[0.98]"
+        >
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+          Abrir Prévia Oficial do Criativo
+        </button>
+      </div>
     `;
+    const btnPopup = el.previewMediaContainer.querySelector('.btn-modal-open-popup');
+    if (btnPopup) {
+      btnPopup.addEventListener('click', () => openAdPopup(ad.snapshotUrl));
+    }
   }
 
   openModal(el.modalAdPreview);
@@ -516,21 +549,50 @@ function normalizeAd(raw) {
   const stopDate = raw.ad_delivery_stop_time || null;
   const daysRunning = calculateDaysRunning(startDate, stopDate, isActive);
 
-  // Extract copy / bodies
-  const bodies = raw.creative_bodies || [];
-  const primaryText = Array.isArray(bodies) ? (bodies[0] || '') : (bodies || '');
+  // Helper to extract first non-empty string from array or object
+  const getFirstOrString = (val) => {
+    if (!val) return '';
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        if (typeof item === 'string' && item.trim()) return item.trim();
+        if (item && typeof item === 'object') {
+          const inner = item.text || item.value || item.url || '';
+          if (inner) return inner;
+        }
+      }
+      return '';
+    }
+    if (typeof val === 'string') return val.trim();
+    return '';
+  };
+
+  // Extract copy / bodies with comprehensive fallbacks
+  const primaryText = getFirstOrString(raw.creative_bodies)
+    || getFirstOrString(raw.ad_creative_bodies)
+    || getFirstOrString(raw.body)
+    || getFirstOrString(raw.creative_body)
+    || '';
 
   // Extract Titles
-  const titles = raw.creative_link_titles || raw.ad_creative_link_titles || [];
-  const primaryTitle = Array.isArray(titles) ? (titles[0] || '') : (titles || '');
+  const primaryTitle = getFirstOrString(raw.creative_link_titles)
+    || getFirstOrString(raw.ad_creative_link_titles)
+    || getFirstOrString(raw.title)
+    || '';
 
   // Extract Descriptions
-  const descriptions = raw.creative_link_descriptions || raw.ad_creative_link_descriptions || [];
-  const primaryDesc = Array.isArray(descriptions) ? (descriptions[0] || '') : (descriptions || '');
+  const primaryDesc = getFirstOrString(raw.creative_link_descriptions)
+    || getFirstOrString(raw.ad_creative_link_descriptions)
+    || getFirstOrString(raw.creative_link_captions)
+    || getFirstOrString(raw.ad_creative_link_captions)
+    || getFirstOrString(raw.description)
+    || '';
 
   // Extract Destination URLs
-  const urls = raw.creative_link_urls || raw.ad_creative_link_urls || [];
-  const destinationUrl = Array.isArray(urls) ? (urls[0] || '') : (urls || '');
+  const destinationUrl = getFirstOrString(raw.creative_link_urls)
+    || getFirstOrString(raw.ad_creative_link_urls)
+    || getFirstOrString(raw.link_url)
+    || getFirstOrString(raw.link_urls)
+    || '';
 
   // Extract Platforms
   const platforms = raw.publisher_platforms || ['facebook', 'instagram'];
@@ -715,21 +777,37 @@ function renderAdsGrid(ads) {
         `;
       } else if (ad.snapshotUrl) {
         mediaBoxHtml = `
-          <div class="my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 relative group">
-            <div class="relative w-full h-[320px] bg-slate-950">
-              <iframe 
-                src="${ad.snapshotUrl}" 
-                class="w-full h-full border-0" 
-                loading="lazy" 
-                sandbox="allow-scripts allow-same-origin allow-popups"
-                title="Prévia do Anúncio ${ad.id}">
-              </iframe>
+          <div class="my-3 rounded-xl overflow-hidden border border-slate-800/90 bg-gradient-to-b from-slate-900 to-dark-950 p-4 relative group">
+            <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/60">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-[10px] font-bold">
+                  FB
+                </div>
+                <div class="text-[11px] text-slate-300 font-medium">Anúncio Oficial Patrocinado</div>
+              </div>
+              <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Criativo Live</span>
+            </div>
+
+            <!-- Ad Highlight -->
+            <div class="py-3 px-2 text-center">
+              <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <i data-lucide="play" class="w-6 h-6 fill-current"></i>
+              </div>
+              <p class="text-xs font-semibold text-slate-200 line-clamp-2 px-2">
+                ${escapeHtml(ad.title || ad.primaryText || 'Criativo Audiovisual / Carrossel do Anúncio')}
+              </p>
+              <p class="text-[11px] text-slate-400 mt-1">Carregado diretamente da Biblioteca da Meta</p>
+            </div>
+
+            <!-- Action button that opens clean popup -->
+            <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center gap-2">
               <button 
                 type="button" 
-                class="btn-open-preview absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-dark-900/90 hover:bg-dark-900 border border-slate-700 text-[11px] text-slate-200 shadow-md backdrop-blur flex items-center gap-1 transition-all"
-                data-ad-id="${ad.id}"
+                class="btn-open-popup w-full py-2 px-3 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                data-url="${ad.snapshotUrl}"
               >
-                <i data-lucide="maximize-2" class="w-3 h-3 text-indigo-400"></i> Expandir
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                Abrir Criativo Oficial (Sem Bloqueio)
               </button>
             </div>
           </div>
@@ -830,6 +908,15 @@ function renderAdsGrid(ads) {
     // Bind Favorite button inside card
     const favBtn = card.querySelector('.btn-fav');
     favBtn.addEventListener('click', () => toggleFavorite(ad));
+
+    // Bind Popup buttons (open clean popup window without iframe DENY error)
+    card.querySelectorAll('.btn-open-popup').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute('data-url');
+        openAdPopup(url);
+      });
+    });
 
     // Bind Preview Open buttons
     card.querySelectorAll('.btn-open-preview').forEach(btn => {
