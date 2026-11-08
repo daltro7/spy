@@ -20,6 +20,7 @@ const state = {
   filteredAds: [],
   nextPageUrl: null,
   isDemo: false,
+  showVisualMedia: true,
 };
 
 // DOM Elements
@@ -33,6 +34,7 @@ const el = {
   filterLimit: document.getElementById('filter-limit'),
   filterPlatform: document.getElementById('filter-platform'),
   sortResults: document.getElementById('sort-results'),
+  toggleVisualMedia: document.getElementById('toggle-visual-media'),
   
   metricsBar: document.getElementById('metrics-bar'),
   toolbarRow: document.getElementById('toolbar-row'),
@@ -48,6 +50,20 @@ const el = {
   statValidated: document.getElementById('stat-validated'),
   statAvgDays: document.getElementById('stat-avg-days'),
   statOldest: document.getElementById('stat-oldest'),
+
+  // Modal: Ad Preview Inside Tool
+  modalAdPreview: document.getElementById('modal-ad-preview'),
+  previewModalTitle: document.getElementById('preview-modal-title'),
+  previewModalSubtitle: document.getElementById('preview-modal-subtitle'),
+  previewModalExternal: document.getElementById('preview-modal-external'),
+  previewMediaContainer: document.getElementById('preview-media-container'),
+  previewPageName: document.getElementById('preview-page-name'),
+  previewBadges: document.getElementById('preview-badges'),
+  previewCopyText: document.getElementById('preview-copy-text'),
+  previewCopyBtn: document.getElementById('preview-copy-btn'),
+  previewOfferTitle: document.getElementById('preview-offer-title'),
+  previewOfferDesc: document.getElementById('preview-offer-desc'),
+  previewOfferLink: document.getElementById('preview-offer-link'),
 
   // Modals & triggers
   btnOpenSettings: document.getElementById('btn-open-settings'),
@@ -125,6 +141,13 @@ function setupEventListeners() {
   el.filterPlatform.addEventListener('change', () => applyFiltersAndRender());
   el.sortResults.addEventListener('change', () => applyFiltersAndRender());
 
+  if (el.toggleVisualMedia) {
+    el.toggleVisualMedia.addEventListener('change', (e) => {
+      state.showVisualMedia = e.target.checked;
+      applyFiltersAndRender();
+    });
+  }
+
   // Demo triggers
   if (el.btnLoadDemo) el.btnLoadDemo.addEventListener('click', () => loadDemoData());
   if (el.btnInitialDemo) el.btnInitialDemo.addEventListener('click', () => loadDemoData());
@@ -145,7 +168,8 @@ function setupEventListeners() {
   });
 
   // Close modal when clicking backdrop
-  [el.modalSettings, el.modalHelp, el.modalFavorites].forEach(modal => {
+  [el.modalSettings, el.modalHelp, el.modalFavorites, el.modalAdPreview, document.getElementById('modal-verification')].forEach(modal => {
+    if (!modal) return;
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeAllModals();
     });
@@ -222,6 +246,63 @@ function showVerificationRequiredModal(details) {
   }
 }
 
+// Open full ad preview inside tool modal
+function openAdPreviewModal(ad) {
+  if (!el.modalAdPreview) return;
+  el.previewPageName.textContent = ad.pageName;
+  el.previewModalTitle.textContent = ad.pageName;
+  el.previewModalSubtitle.textContent = `ID do Anúncio: ${ad.id} • ${ad.daysRunning} dias ativo`;
+  el.previewModalExternal.href = ad.snapshotUrl;
+
+  // Badges
+  let badgeHtml = '';
+  if (ad.daysRunning >= 30) {
+    badgeHtml += `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300">👑 Super Escala: ${ad.daysRunning}d</span>`;
+  } else if (ad.daysRunning >= 10) {
+    badgeHtml += `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">🔥 Validado: ${ad.daysRunning}d</span>`;
+  } else {
+    badgeHtml += `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">⏱️ ${ad.daysRunning}d no ar</span>`;
+  }
+  badgeHtml += ad.isActive
+    ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-400">● Ativo</span>`
+    : `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">Inativo</span>`;
+  el.previewBadges.innerHTML = badgeHtml;
+
+  // Copy
+  el.previewCopyText.textContent = ad.primaryText || '(Sem texto capturado)';
+  el.previewCopyBtn.onclick = () => {
+    navigator.clipboard.writeText(ad.primaryText || '');
+    showToast('Copy copiada!', 'success');
+  };
+
+  // Offer Info
+  if (ad.title || ad.destinationUrl) {
+    el.previewOfferTitle.textContent = ad.title || 'Oferta Principal';
+    el.previewOfferDesc.textContent = ad.description || (ad.destinationUrl ? new URL(ad.destinationUrl).hostname : '');
+    el.previewOfferLink.href = ad.destinationUrl || ad.snapshotUrl;
+  } else {
+    el.previewOfferTitle.textContent = 'Link não especificado';
+    el.previewOfferDesc.textContent = '';
+    el.previewOfferLink.href = ad.snapshotUrl;
+  }
+
+  // Media Container (Direct render in modal)
+  el.previewMediaContainer.innerHTML = '';
+  if (ad.imageUrl) {
+    el.previewMediaContainer.innerHTML = `
+      <div class="flex flex-col items-center justify-center p-4 w-full h-full">
+        <img src="${ad.imageUrl}" alt="${escapeHtml(ad.pageName)}" class="max-h-[500px] w-auto max-w-full object-contain rounded-xl shadow-2xl">
+      </div>
+    `;
+  } else if (ad.snapshotUrl) {
+    el.previewMediaContainer.innerHTML = `
+      <iframe src="${ad.snapshotUrl}" class="w-full h-full min-h-[460px] border-0 rounded-xl bg-slate-950" sandbox="allow-scripts allow-same-origin allow-popups" loading="lazy"></iframe>
+    `;
+  }
+
+  openModal(el.modalAdPreview);
+}
+
 // Modal management
 function openModal(modal) {
   modal.classList.remove('hidden');
@@ -229,9 +310,12 @@ function openModal(modal) {
 }
 
 function closeAllModals() {
-  el.modalSettings.classList.add('hidden');
-  el.modalHelp.classList.add('hidden');
-  el.modalFavorites.classList.add('hidden');
+  if (el.modalSettings) el.modalSettings.classList.add('hidden');
+  if (el.modalHelp) el.modalHelp.classList.add('hidden');
+  if (el.modalFavorites) el.modalFavorites.classList.add('hidden');
+  if (el.modalAdPreview) el.modalAdPreview.classList.add('hidden');
+  const modVer = document.getElementById('modal-verification');
+  if (modVer) modVer.classList.add('hidden');
 }
 
 // Toast Notification
@@ -463,6 +547,7 @@ function normalizeAd(raw) {
     title: primaryTitle,
     description: primaryDesc,
     destinationUrl: destinationUrl,
+    imageUrl: raw.imageUrl || raw.image_url || null,
     snapshotUrl: raw.ad_snapshot_url || `https://www.facebook.com/ads/library/?id=${raw.id}`,
     platforms: platforms,
     currency: raw.currency || 'BRL',
@@ -609,6 +694,49 @@ function renderAdsGrid(ads) {
       }
     }
 
+    // Visual Creative Embed Box
+    let mediaBoxHtml = '';
+    if (state.showVisualMedia) {
+      if (ad.imageUrl) {
+        mediaBoxHtml = `
+          <div class="my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 relative group cursor-pointer btn-open-preview" data-ad-id="${ad.id}">
+            <div class="relative w-full aspect-video bg-slate-900 overflow-hidden">
+              <img src="${ad.imageUrl}" alt="${escapeHtml(ad.pageName)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-2.5">
+                <span class="text-[10px] text-white/90 font-medium flex items-center gap-1 bg-black/60 backdrop-blur px-2 py-0.5 rounded">
+                  <i data-lucide="image" class="w-3 h-3 text-indigo-400"></i> Criativo
+                </span>
+                <span class="text-[10px] text-indigo-300 font-semibold flex items-center gap-1 bg-indigo-950/80 border border-indigo-500/40 px-2 py-0.5 rounded">
+                  <i data-lucide="eye" class="w-3 h-3"></i> Ver Anúncio
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (ad.snapshotUrl) {
+        mediaBoxHtml = `
+          <div class="my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 relative group">
+            <div class="relative w-full h-[320px] bg-slate-950">
+              <iframe 
+                src="${ad.snapshotUrl}" 
+                class="w-full h-full border-0" 
+                loading="lazy" 
+                sandbox="allow-scripts allow-same-origin allow-popups"
+                title="Prévia do Anúncio ${ad.id}">
+              </iframe>
+              <button 
+                type="button" 
+                class="btn-open-preview absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-dark-900/90 hover:bg-dark-900 border border-slate-700 text-[11px] text-slate-200 shadow-md backdrop-blur flex items-center gap-1 transition-all"
+                data-ad-id="${ad.id}"
+              >
+                <i data-lucide="maximize-2" class="w-3 h-3 text-indigo-400"></i> Expandir
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     card.innerHTML = `
       <!-- Card Header -->
       <div>
@@ -634,6 +762,9 @@ function renderAdsGrid(ads) {
           </button>
         </div>
 
+        <!-- Embedded Visual Media (Ad Creative) -->
+        ${mediaBoxHtml}
+
         <!-- Copy / Creative Body -->
         <div class="my-3 p-3 rounded-xl bg-dark-950/70 border border-slate-800/80">
           <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5 pb-1 border-b border-slate-800/50">
@@ -642,7 +773,7 @@ function renderAdsGrid(ads) {
               <i data-lucide="copy" class="w-3 h-3"></i> Copiar
             </button>
           </div>
-          <p class="text-xs text-slate-200 leading-relaxed line-clamp-4 whitespace-pre-wrap font-sans selection:bg-indigo-600">
+          <p class="text-xs text-slate-200 leading-relaxed line-clamp-3 whitespace-pre-wrap font-sans selection:bg-indigo-600">
             ${escapeHtml(ad.primaryText || '(Sem texto capturado)')}
           </p>
         </div>
@@ -663,15 +794,14 @@ function renderAdsGrid(ads) {
 
       <!-- Card Footer Actions -->
       <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 mt-2">
-        <a 
-          href="${ad.snapshotUrl}" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/25 transition-all"
+        <button 
+          type="button" 
+          class="btn-open-preview flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition-all"
+          data-ad-id="${ad.id}"
         >
           <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-          Ver na Biblioteca Meta
-        </a>
+          Ver na Ferramenta
+        </button>
 
         ${ad.destinationUrl ? `
           <a 
@@ -684,12 +814,27 @@ function renderAdsGrid(ads) {
             <i data-lucide="globe" class="w-4 h-4 text-emerald-400"></i>
           </a>
         ` : ''}
+
+        <a 
+          href="${ad.snapshotUrl}" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="inline-flex items-center justify-center p-2 rounded-xl text-xs font-medium bg-slate-800 border border-slate-700 text-slate-400 hover:text-indigo-300 hover:bg-slate-700 transition-all"
+          title="Abrir na Biblioteca Meta Oficial"
+        >
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+        </a>
       </div>
     `;
 
     // Bind Favorite button inside card
     const favBtn = card.querySelector('.btn-fav');
     favBtn.addEventListener('click', () => toggleFavorite(ad));
+
+    // Bind Preview Open buttons
+    card.querySelectorAll('.btn-open-preview').forEach(btn => {
+      btn.addEventListener('click', () => openAdPreviewModal(ad));
+    });
 
     // Bind Copy button
     const copyBtn = card.querySelector('.btn-copy-text');
@@ -878,6 +1023,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 47,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&auto=format&fit=crop&q=80',
       primaryText: '🚨 Revelado o segredo das clínicas de estética! Apenas 2 gotas pela manhã antes do café aceleram o metabolismo sem dietas restritivas. Mais de 4.800 mulheres já testaram e aprovaram essa fórmula 100% natural com registro na Anvisa.\n\n👉 Toque no botão e aproveite o kit com frete grátis!',
       title: 'Fórmula Termogênica Concentrada - 2 Gotas ao Dia',
       description: 'Resultados visíveis logo nas primeiras semanas. Garantia incondicional de 90 dias.',
@@ -893,6 +1039,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 34,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
       primaryText: 'Quer parar de perder dinheiro subindo campanhas no escuro? Criamos uma esteira automática de mineração e validação de criativos no Meta Ads.\n\nAssista à aula prática de 15 minutos onde mostramos o passo a passo da nossa estrutura de escala.',
       title: 'Masterclass Gratuita: Escala Previsível no Facebook Ads',
       description: 'Sem enrolação: aprenda a identificar criativos com ROAS 4x.',
@@ -908,6 +1055,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 21,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=600&auto=format&fit=crop&q=80',
       primaryText: 'Adeus dores nas costas ao acordar! Conheça o travesseiro anatômico de espuma de memória ortopédica que alinha sua coluna durante a noite inteira.\n\nOferta relâmpago de Compre 1 Leve 2 somente hoje!',
       title: 'Travesseiro Cervical Ergonômico - Sono Profundo',
       description: 'Envio imediato com código de rastreio e garantia total de satisfação.',
@@ -923,6 +1071,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 14,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
       primaryText: 'Como faturar de 3 a 5 mil reais por mês criando pequenas automações de inteligência artificial para comércios locais da sua cidade, trabalhando só 2 horas por dia do seu computador.',
       title: 'Treinamento Prático: Agência de IA para Iniciantes',
       description: 'Inscrições abertas com 70% de desconto no plano vitalício.',
@@ -938,6 +1087,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 11,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80',
       primaryText: 'Sérum Rejuvenescedor com Ácido Hialurônico e Niacinamida Pura. Reduz linhas de expressão e uniformiza o tom da pele em até 14 dias.\n\nFrete grátis para todo o Brasil.',
       title: 'Kit Tratamento Antissinais Noturno',
       description: 'Dermatologicamente testado. Compre agora com desconto exclusivo.',
@@ -953,6 +1103,7 @@ function loadDemoData() {
       stopDate: null,
       daysRunning: 2,
       isActive: true,
+      imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
       primaryText: 'Teste de copy número 3 com gancho em vídeo curto para drop nacional.',
       title: 'Produto Teste',
       description: 'Em fase de validação inicial.',
